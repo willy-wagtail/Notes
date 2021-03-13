@@ -249,6 +249,8 @@ Other notes
 - Use ``GPT`` partitions instead of MBR, esp for larger disks
 - Dont write directly into block device files, esp the case for the file for the entire drive, as it doesnt - understand partitions - so can write across all partitions
 
+Check out ``gdisk`` over ``fdisk`` and ``parted``.
+
 ## 2 Filesystems
 
 ### 2.1 Intro to filesystems
@@ -318,7 +320,7 @@ Mounting is like assigning the filesystem an address so it can be accessed. Can 
 - ``t`` option is for filesystem type
 - ``mount -t xfs /dev/sdc1 /testmount`` will get a filesystem error as device is not xfs
 
-```mount -l -t ext4`` list all mounts of type ext4 to check it has worked
+``mount -l -t ext4`` list all mounts of type ext4 to check it has worked
 - ``l`` option is for listing
 
 ``cp -r /var/log /testmount`` copy all log files over to mountpoint
@@ -362,7 +364,7 @@ Automatic mounting
   - device, mountpoint, filesystem, options, dumping, fscking
   
 instead of ``/dev/sdc1``, better to specify with UUID found using below commands
-- ``bldid`` use block id command to get uuid
+- ``blkid`` use block id command to get uuid
 - ``lsblk --fs`` to print devices and fs with uuid
 - replace ``/dev/sdc/1`` with ``UUID=<uuid>``
 

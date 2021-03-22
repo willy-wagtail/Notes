@@ -678,5 +678,764 @@ all container probes must pass for a pod to pass
 probe actions can be a command that runs in the container, an HTTP get request , or open a tcp socket
 by default probes check containers every 10 seconds
 
+### 2.9 Init containers
+
+Way to run tasks or prerequisites which are required to complete before the main container starts.
+separate init logic from container image
+
+pods declare any number. they will run in order they are declared. init containers use their own images.
+easy way to block or delay starting an app until useful task is first done.
+runss every time pod is created/restarted.
+
+add init container in our app tier that will wait for redis before starting any application servers
+
+useful for checking preconditions and preparing dependencies.
+
+### 2.10 Volumes
+
+share data between containers in pod
+
+lifetime of container file system is limited to container lifetime which leads to unexpected consequences if container  restarts
+
+how to handle nonephemeral data
+deploy a persistent data tier
+options for storing data
 
 
+two high level storage options - volumes and persistent volumes
+
+used by mounting dir in one or more containers
+
+pods can use many
+
+diff is how lifecycle is manahed
+
+
+volumes tied to a pod and pod lifecyucle
+share data between contaienrs and tolerate restarts
+use for non duratble storage deleted with the pod
+default volume type is emptyDir
+data is lost if pod is rescheduled on a different node
+
+
+persistent volumes independent of pods lifetime
+pods claim persistent vol to use throughtout their lifetimes
+mounted by multiple pods on diff nodes 
+
+
+persistent vol claim (PVC) 
+ descibe a pods request for persistent volume
+ how much, type, access mode
+ access mode , read wriote one, read only many,  read-write many
+ PVA stays pending if no PV can satisfy. 
+connectsd to a pod through a volume of type PVC
+
+backed by wide vaiety of volume types
+use PV for durable types
+supported storage types: GCE. Azire, Amazon EBS, NFS
+
+
+### 2.11 Config maps and secrets
+
+pod spec config is less portable
+sensitive info such as api keys is security issue
+
+config maps and secrests
+separate config from pod specs
+results in more portable and easier to manage manifests
+Secrets are for sensitive data
+specialised types of secrets 
+here will refer to generic 
+
+data stored as key value pairs
+pods reference config map and secretes
+references made by mounting volumes or setting env vars
+
+create config name space
+yaml has kind ConfigMap, metadata name = redisu, and data: config: whatever config
+
+
+
+## 3 Lab
+
+### 3.1 Instructions
+
+kubectl get nodes
+
+Pods
+kubectl get pods
+cd src
+kubectl create -f 1.1-basic_pod.yaml
+kubectl get pods
+kubectl describe pod mypod | more
+kubectl delete pod mypod
+kubectl create -f 1.2-port_pod.yaml
+kubectl describe pod mypod | more
+curl 192.168.###.###:80 (Replace ###.### with the IP address octets from the describe output)
+# This command will time out (see the next lesson to understand why)
+kubectl describe pod mypod | more
+kubectl delete pod mypod
+kubectl create -f 1.4-resources_pod.yaml
+kubectl describe pod mypod | more
+Note: kubectl will accept the singular or plural form of resource kinds. For example kubectl get pods and kubectl get pod are equivalent.
+
+Services
+kubectl create -f 2.1-web_service.yaml
+kubectl get services
+kubectl describe service webserver
+kubectl describe nodes | grep -i address -A 1
+curl 10.0.0.100:3#### (replace #### with the actual port digits)
+ 
+
+Multi-Container Pods
+kubectl create -f 3.1-namespace.yaml
+kubectl create -f 3.2-multi_container.yaml -n microservice
+kubectl get -n microservice pod app
+kubectl describe -n microservice pod app
+kubectl logs -n microservice app counter --tail 10
+kubectl logs -n microservice app poller -f
+ 
+
+Service Discovery
+kubectl create -f 4.1-namespace.yaml
+kubectl create -f 4.2-data_tier.yaml -n service-discovery
+kubectl get pod -n service-discovery
+kubectl describe service -n service-discovery data-tier
+kubectl create -f 4.3-app_tier.yaml -n service-discovery
+kubectl create -f 4.4-support_tier.yaml -n service-discovery
+kubectl get pods -n service-discovery
+kubectl logs -n service-discovery support-tier poller -f
+ 
+
+Deployments
+kubectl create -f 5.1-namespace.yaml
+kubectl create -n deployments -f 5.2-data_tier.yaml -f 5.3-app_tier.yaml -f 5.4-support_tier.yaml
+kubectl get -n deployments deployments
+kubectl -n deployments get pods
+kubectl scale -n deployments deployment support-tier --replicas=5
+kubectl -n deployments get pods
+kubectl delete -n deployments pods support-tier-... support-tier-... --wait=false (You can use tab completion to display the possible values to replace ... with)
+watch -n 1 kubectl -n deployments get pods
+kubectl scale -n deployments deployment app-tier --replicas=5
+kubectl -n deployments get pods
+kubectl describe -n deployments service app-tier
+ 
+
+Autoscaling
+kubectl create -f metrics-server/
+watch kubectl top pods -n deployments
+kubectl create -f 6.1-app_tier_cpu_request.yaml -n deployments
+kubectl apply -f 6.1-app_tier_cpu_request.yaml -n deployments
+kubectl get -n deployments deployments app-tier
+kubectl create -f 6.2-autoscale.yaml -n deployments
+watch -n 1 kubectl get -n deployments deployments app-tier
+kubectl api-resources
+kubectl describe -n deployments hpa
+kubectl get -n deployments hpa
+kubectl edit -n deployments hpa
+watch -n 1 kubectl get -n deployments deployments app-tier
+ 
+
+Rolling Updates and Rollbacks
+kubectl delete -n deployments hpa app-tier
+kubectl edit -n deployments deployment app-tier
+watch -n 1 kubectl get -n deployments deployments app-tier 
+kubectl edit -n deployments deployment app-tier
+kubectl rollout -n deployments status deployment app-tier
+tmux
+kubectl edit -n deployments deployments app-tier (left terminal)
+kubectl rollout -n deployments status deployment app-tier (right terminal)
+kubectl rollout -n deployments pause deployment app-tier (left terminal)
+kubectl get deployments -n deployments app-tier (left terminal)
+kubectl rollout -n deployments resume deployment app-tier (left terminal)
+kubectl rollout -n deployments undo deployment app-tier
+kubectl scale -n deployments deployment app-tier --replicas=1
+ 
+
+Probes
+kubectl create -f 7.1-namespace.yaml
+kubectl create -f 7.2-data_tier.yaml -n probes
+kubectl get deployments -n probes -w
+kubectl create -f 7.3-app_tier.yaml -n probes
+kubectl get -n probes deployments app-tier -w
+kubectl get -n probes pods
+kubectl logs -n probes app-tier-... | cut -d' ' -f5,8-11 (You can use tab completion to display the possible values to replace ... with)
+ 
+
+Init Containers
+kubectl apply -f 8.1-app_tier.yaml -n probes
+kubectl describe pod -n probes app-tier... (You can use tab completion to display the possible values to replace ... with)
+kubectl logs -n probes app-tier-... await-redis (You can use tab completion to display the possible values to replace ... with)
+ 
+
+Volumes
+kubectl -n deployments logs support-tier-... poller --tail 1 (You can use tab completion to display the possible values to replace ... with)
+kubectl exec -n deployments data-tier-... -it /bin/bash (You can use tab completion to display the possible values to replace ... with)
+kill 1
+kubectl -n deployments get pods
+kubectl -n deployments logs support-tier-... poller --tail 1 (You can use tab completion to display the possible values to replace ... with)
+Note: It takes around a couple of minutes for the effects of the restart to settle. The poller will stop updating and report the last value before restarting until it can reach the new data tier value. Try again after a minute if you don't see a relatively small value)
+kubectl create -f 9.1-namespace.yaml
+aws ec2 describe-volumes --region=us-west-2 --filters="Name=tag:Type,Values=PV" --query="Volumes[0].VolumeId" --output=text
+vol_id=$(aws ec2 describe-volumes --region=us-west-2 --filters="Name=tag:Type,Values=PV" --query="Volumes[0].VolumeId" --output=text)
+sed -i "s/INSERT_VOLUME_ID/$vol_id/" 9.2-pv_data_tier.yaml
+kubectl create -n volumes -f 9.2-pv_data_tier.yaml -f 9.3-app_tier.yaml -f 9.4-support_tier.yaml
+kubectl describe -n volumes pvc
+kubectl describe -n volumes pod data-tier-... (You can use tab completion to display the possible values to replace ... with)
+kubectl logs -n volumes support-tier-... poller --tail 1 (You can use tab completion to display the possible values to replace ... with)
+Note: It takes a few minutes for all of the readiness checks to pass and for the counter to start incrementing. If you don't see a counter value output then try again after a minute or two.
+kubectl delete -n volumes deployments data-tier
+kubectl get -n volumes pods
+kubectl create -f 9.2-pv_data_tier.yaml
+kubectl logs -n volumes support-tier-... poller --tail 1 (You can use tab completion to display the possible values to replace ... with)
+ 
+
+ConfigMaps and Secrets
+kubectl create -f 10.1-namespace.yaml
+kubectl create -n config -f 10.2-data_tier_config.yaml -f 10.3-data_tier.yaml
+kubectl exec -n config data-tier-... -it /bin/bash (You can use tab completion to display the possible values to replace ... with)
+cat /etc/redis/redis.conf
+redis-cli CONFIG GET tcp-keepalive
+exit
+kubectl edit -n config configmaps redis-config
+kubectl exec -n config data-tier-... redis-cli CONFIG GET tcp-keepalive (You can use tab completion to display the possible values to replace ... with)
+kubectl rollout -n config restart deployment data-tier
+kubectl exec -n config data-tier-... redis-cli CONFIG GET tcp-keepalive (You can use tab completion to display the possible values to replace ... with)
+kubectl create -f 10.4-app_tier_secret.yaml -n config
+kubectl describe -n config secret app-tier-secret
+kubectl edit -n config secrets data-tier-secret
+kubectl create -f 10.5-app_tier.yaml -n config
+kubectl exec -n config app-tier-... env (You can use tab completion to display the possible values to replace ... with)
+
+
+
+### 3.2 Code along
+
+#### 3.2.1 Pods
+
+``cat 1.1-basic_pod.yaml`` 
+  ```
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: mypod
+  spec:
+    containers:
+    - name: mycontainer
+      image: nginx:latest
+  ```
+
+``kubectl create -f 1.1-basic_pod.yaml``
+``kubectl get pods``
+``kubectl describe pod mypod | more``
+``kubectl delete pod mypod``
+
+``cat 1.2-port_pod.yaml``
+  ```
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: mypod
+  spec:
+    containers:
+    - name: mycontainer
+      image: nginx:latest
+      ports:
+        - containerPort: 80
+  ```
+
+``kubectl create -f 1.2-port_pod.yaml``
+``kubectl describe pod mypod | more``
+``curl 192.168.242.2:80``
+- doesnt work as pod is part of container network
+``kubectl delete pod mypod``
+
+``cat 1.3-labeled_pod.yaml``
+  ```
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: mypod
+    labels:
+      app: webserver
+  spec:
+    containers:
+    - name: mycontainer
+      image: nginx:latest
+      ports:
+        - containerPort: 80
+  ```
+
+``cat 1.4-resources_pod.yaml ``
+  ```
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: mypod
+    labels:
+      app: webserver
+  spec:
+    containers:
+    - name: mycontainer
+      image: nginx:latest
+      resources:
+        requests:
+          memory: "128Mi" # 128Mi = 128 mebibytes
+          cpu: "500m"     # 500m = 500 milliCPUs (1/2 CPU)
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+      ports:
+        - containerPort: 80
+  ```
+``kubectl create -f 1.4-resources_pod.yaml``
+``kubectl describe pod mypod | more``
+
+#### 3.2.2 Services
+
+``cat 2.1-web_service.yaml``
+  ```
+  apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: webserver
+    name: webserver
+  spec:
+    ports:
+    - port: 80
+    selector:
+      app: webserver
+    type: NodePort
+  ```
+
+``kubectl create -f 2.1-web_service.yaml``
+``kubectl get services``
+``kubectl describe service webserver``
+``kubectl describe nodes | grep -i address -A 1``
+``curl 10.0.0.100:30731`` (replace #### with the actual port digits) (can curl the IP of any of the nodes)
+
+#### 3.2.3 Multicontainer pods
+
+``cat 3.1-namespace.yaml``
+  ``` 
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: microservice
+    labels:
+      app: counter
+  ```
+``kubectl create -f 3.1-namespace.yaml``
+
+``cat 3.2-multi_container.yaml`` 
+  ```
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: app
+  spec:
+    containers:
+      - name: redis
+        image: redis:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 6379
+      
+      - name: server
+        image: lrakai/microservices:server-v1
+        ports:
+          - containerPort: 8080
+        env:
+          - name: REDIS_URL
+            value: redis://localhost:6379
+
+      - name: counter
+        image: lrakai/microservices:counter-v1
+        env:
+          - name: API_URL
+            value: http://localhost:8080
+
+      - name: poller
+        image: lrakai/microservices:poller-v1
+        env:
+          - name: API_URL
+            value: http://localhost:8080
+  ```
+
+``kubectl create -f 3.2-multi_container.yaml -n microservice``
+``kubectl get -n microservice pod app``
+``kubectl describe -n microservice pod app``
+``kubectl logs -n microservice app counter --tail 10``
+``kubectl logs -n microservice app poller -f``
+
+#### 3.2.4 Service discovery
+
+``cat 4.1-namespace.yaml``
+  ``` 
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: service-discovery
+    labels:
+      app: counter
+  ```
+``kubectl create -f 4.1-namespace.yaml``
+
+``cat 4.2-data_tier.yaml``
+  ```
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: data-tier
+    labels:
+      app: microservices
+  spec:
+    ports:
+    - port: 6379
+      protocol: TCP # default 
+      name: redis # optional when only 1 port
+    selector:
+      tier: data 
+    type: ClusterIP # default
+  ---
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: data-tier
+    labels:
+      app: microservices
+      tier: data
+  spec:
+    containers:
+      - name: redis
+        image: redis:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 6379
+  ```
+``kubectl create -f 4.2-data_tier.yaml -n service-discovery``
+``kubectl get pod -n service-discovery``
+``kubectl describe service -n service-discovery data-tier``
+
+``cat 4.3-app_tier.yaml ``
+  ```
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: app-tier
+    labels:
+      app: microservices
+  spec:
+    ports:
+    - port: 8080
+    selector:
+      tier: app
+  ---
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: app-tier
+    labels:
+      app: microservices
+      tier: app
+  spec:
+    containers:
+      - name: server
+        image: lrakai/microservices:server-v1
+        ports:
+          - containerPort: 8080
+        env:
+          - name: REDIS_URL
+            # Environment variable service discovery
+            # Naming pattern:
+            #   IP address: <all_caps_service_name>_SERVICE_HOST
+            #   Port: <all_caps_service_name>_SERVICE_PORT
+            #   Named Port: <all_caps_service_name>_SERVICE_PORT_<all_caps_port_name>
+            value: redis://$(DATA_TIER_SERVICE_HOST):$(DATA_TIER_SERVICE_PORT_REDIS)
+            # In multi-container example value was
+            # value: redis://localhost:6379 
+  ```
+
+``kubectl create -f 4.3-app_tier.yaml -n service-discovery``
+
+
+``cat 4.4-support_tier.yaml`` 
+  ```
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: support-tier
+    labels:
+      app: microservices
+      tier: support
+  spec:
+    containers:
+
+      - name: counter
+        image: lrakai/microservices:counter-v1
+        env:
+          - name: API_URL
+            # DNS for service discovery
+            # Naming pattern:
+            #   IP address: <service_name>.<service_namespace>
+            #   Port: needs to be extracted from SRV DNS record
+            value: http://app-tier.service-discovery:8080
+
+      - name: poller
+        image: lrakai/microservices:poller-v1
+        env:
+          - name: API_URL
+            # omit namespace to only search in the same namespace
+            value: http://app-tier:$(APP_TIER_SERVICE_PORT)
+  ```
+``kubectl create -f 4.4-support_tier.yaml -n service-discovery``
+``kubectl get pods -n service-discovery``
+``kubectl logs -n service-discovery support-tier poller -f``
+
+#### 3.2.5 Deployments
+
+``cat 5.1-namespace.yaml ``
+  ```
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: deployments
+    labels:
+      app: counter
+  ```
+``kubectl create -f 5.1-namespace.yaml``
+
+``cat 5.2-data_tier.yaml``
+  ```
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: data-tier
+    labels:
+      app: microservices
+  spec:
+    ports:
+    - port: 6379
+      protocol: TCP # default 
+      name: redis # optional when only 1 port
+    selector:
+      tier: data 
+    type: ClusterIP # default
+  ---
+  apiVersion: apps/v1 # apps API group
+  kind: Deployment
+  metadata:
+    name: data-tier
+    labels:
+      app: microservices
+      tier: data
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        tier: data
+    template:
+      metadata:
+        labels:
+          app: microservices
+          tier: data
+      spec: # Pod spec
+        containers:
+        - name: redis
+          image: redis:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+  ```
+
+``cat 5.3-app_tier.yaml ``
+  ```
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: app-tier
+    labels:
+      app: microservices
+  spec:
+    ports:
+    - port: 8080
+    selector:
+      tier: app
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: app-tier
+    labels:
+      app: microservices
+      tier: app
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        tier: app
+    template:
+      metadata:
+        labels:
+          app: microservices
+          tier: app
+      spec:
+        containers:
+        - name: server
+          image: lrakai/microservices:server-v1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: REDIS_URL
+              # Environment variable service discovery
+              # Naming pattern:
+              #   IP address: <all_caps_service_name>_SERVICE_HOST
+              #   Port: <all_caps_service_name>_SERVICE_PORT
+              #   Named Port: <all_caps_service_name>_SERVICE_PORT_<all_caps_port_name>
+              value: redis://$(DATA_TIER_SERVICE_HOST):$(DATA_TIER_SERVICE_PORT_REDIS)
+              # In multi-container example value was
+              # value: redis://localhost:6379 
+  ```
+
+``cat 5.4-support_tier.yaml``
+  ```
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: support-tier
+    labels:
+      app: microservices
+      tier: support
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        tier: support
+    template:
+      metadata:
+        labels:
+          app: microservices
+          tier: support
+      spec:
+          containers:
+
+          - name: counter
+            image: lrakai/microservices:counter-v1
+            env:
+              - name: API_URL
+                # DNS for service discovery
+                # Naming pattern:
+                #   IP address: <service_name>.<service_namespace>
+                #   Port: needs to be extracted from SRV DNS record
+                value: http://app-tier.deployments:8080
+
+          - name: poller
+            image: lrakai/microservices:poller-v1
+            env:
+              - name: API_URL
+                # omit namespace to only search in the same namespace
+                value: http://app-tier:$(APP_TIER_SERVICE_PORT)
+  ```
+
+``kubectl create -n deployments -f 5.2-data_tier.yaml -f 5.3-app_tier.yaml -f 5.4-support_tier.yaml``
+``kubectl get -n deployments deployments``
+``kubectl -n deployments get pods``
+``kubectl scale -n deployments deployment support-tier --replicas=5``
+``kubectl -n deployments get pods``
+``kubectl delete -n deployments pods support-tier-... support-tier-... --wait=false`` (You can use tab completion to display the possible values to replace ... with)
+``watch -n 1 kubectl -n deployments get pods``
+``kubectl scale -n deployments deployment app-tier --replicas=5``
+``kubectl -n deployments get pods``
+``kubectl describe -n deployments service app-tier``
+
+#### 3.2.6 Autoscaling
+
+``kubectl create -f metrics-server/``
+``watch kubectl top pods -n deployments``
+
+``cat 6.1-app_tier_cpu_request.yaml ``
+  ```
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: app-tier
+    labels:
+      app: microservices
+  spec:
+    ports:
+    - port: 8080
+    selector:
+      tier: app
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: app-tier
+    labels:
+      app: microservices
+      tier: app
+  spec:
+    replicas: 5
+    selector:
+      matchLabels:
+        tier: app
+    template:
+      metadata:
+        labels:
+          app: microservices
+          tier: app
+      spec:
+        containers:
+        - name: server
+          image: lrakai/microservices:server-v1
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 20m # 20 milliCPU / 0.02 CPU
+          env:
+            - name: REDIS_URL
+              # Environment variable service discovery
+              # Naming pattern:
+              #   IP address: <all_caps_service_name>_SERVICE_HOST
+              #   Port: <all_caps_service_name>_SERVICE_PORT
+              #   Named Port: <all_caps_service_name>_SERVICE_PORT_<all_caps_port_name>
+              value: redis://$(DATA_TIER_SERVICE_HOST):$(DATA_TIER_SERVICE_PORT_REDIS)
+              # In multi-container example value was
+              # value: redis://localhost:6379 
+  ```
+
+``kubectl create -f 6.1-app_tier_cpu_request.yaml -n deployments`` - already exist and fails
+``kubectl apply -f 6.1-app_tier_cpu_request.yaml -n deployments`` - updates existing
+``kubectl get -n deployments deployments app-tier``
+
+``cat 6.2-autoscale.yaml ``
+  ```
+  apiVersion: autoscaling/v1
+  kind: HorizontalPodAutoscaler
+  metadata:
+    name: app-tier
+    labels:
+      app: microservices
+      tier: app
+  spec:
+    maxReplicas: 5
+    minReplicas: 1
+    scaleTargetRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: app-tier
+    targetCPUUtilizationPercentage: 70
+
+  # Equivalent to
+  # kubectl autoscale deployment app-tier --max=5 --min=1 --cpu-percent=70
+  ```
+
+``kubectl create -f 6.2-autoscale.yaml -n deployments`` 
+``watch -n 1 kubectl get -n deployments deployments app-tier``
+``kubectl api-resources``
+``kubectl describe -n deployments hpa``
+``kubectl get -n deployments hpa``
+``kubectl edit -n deployments hpa``
+``watch -n 1 kubectl get -n deployments deployments app-tier``

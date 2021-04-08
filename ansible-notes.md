@@ -2,6 +2,7 @@
 
 1. [Inventory](#1-inventory)
 2. [Connection settings and privilege escalation](#2-connection-settings-and-privilege-escalation)
+3. [Adhoc commands](#3-adhoc-commands)
 
 ## 1 Inventory
 
@@ -329,25 +330,26 @@ Ad-hoc commands are simple one line operations that run without writing a playbo
 
 Ansible provides modules, code that can be used to automate particular tasks
 - some use of modules include
-  - ensure users exist
-  - make sure latest verseion of software packages are installed
+  - ensure users exist withc ertain settings
+  - make sure latest version of software packages are installed
   - deploy a config file to a server
   - enable a network service and make sure it is running
 - most modules are idempotent which means they only make changes if a change is needed. They can safely be run multiple times.
-- ad-hoc command runs one module on the specified managed host
+- an ad-hoc command runs one module on the specified managed host
 
 The ``ansible host-pattern -m module [-a 'module arguments'] [-i inventory]`` command runs an ad-hoc command
 - supply a ``host-pattern`` argument with the managed host to run on
 - the ``-m`` option names the module that ansible should run
 - the ``-a`` option takes a list of all arguments required by the module
+- the ``-i`` option is where the host can be found
 
-One of the simplest ad-hoc commands is ``ansible all -m ping``, using the ping module
-- it does not send an ICMP ping to managed host like usual understanding of ping
+One of the simplest ad-hoc commands is ``ansible all -m ping``. Using the ping module, it calls all hosts.
+- it does not send an ICMP ping to managed host like the usual understanding of ping
 - it checks to see if ansible modules written in Python can run on the managed host
   - the output showing "SUCCESS" against the host means it was able to contact the host and it replied with the answer ``pong``
 
 To override a default configuration setting there are several different options. These options override the configuration in ``ansible.cfg`` configuration file
-- ``-k`` or ``--ask-pass`` will  prompt for the connection password
+- ``-k`` or ``--ask-pass`` will prompt for the connection password
 - ``-u REMOTE_USER`` overrides the ``remote_user`` setting in ``ansible.cfg``
 - ``-b`` option or ``--become`` enables privilege escalation, running operations with ``become: yes``
 - ``-K`` of ``--ask-become-pass`` will prompt for the privilege escalation password
@@ -367,5 +369,60 @@ Most modules take arguments to control them using the ``-a`` option to pass argu
 ``ansible-doc -l`` lists all modules available to us. It is a long list.
 - ``ansible-doc -l | grep ping`` to narrow it down to find ping module
 - ``ansible-doc ping`` to get full details of the ping module
+- bottom of documentation, there are examples of use.
 
-6:40
+### Demo
+
+Now we have looked up the docs for the ansible module we want to run:
+First, ``ansible --version`` to show default ansible config file to see inventory
+- ``cat ansible.cfg`` and we see we are overriding the default ``/etc/ansible/hosts`` inventory file to ``/home/demo/ansible/inventory``
+- ``cat inventory``
+- ```
+  [webservers]
+  web01
+  web02
+
+  [databases]
+  db[01:02]
+  ```
+
+Next run command ``ansible all -i inventory -m ping`` to ping all hosts in the inventory.
+
+Can supply additional args, and limit hosts.
+- E.g. force a password handshake instead of relying on our SSH keys, supply ``-k`` flag to get ansible to prompt for passwords when authenticating.
+- ``ansible all --limit web01 -i inventory -k -m ping`` targets all host, but limiting to a single one.
+
+Lets try another module that manages services
+- ``ansible-doc -l | grep service`` - find ``service`` which "manages services"
+- ``ansible-doc service`` to look at the documentation for just this module
+  - controls services on remote hosts. See examples at the end.
+
+Lets try an ad-hoc command to reestart ``sshd`` on one of our targeted hosts.
+- ``ansible all -m service -a "state=restarted name=sshd"`` will restart sshd service in each of the hosts
+
+Lets try creating users on our target machines
+- ``ansible-doc user`` to check out the module documentation. Note the "=" sign in the docs denotes mandatory fields (name is one of them).
+- ``ansible webservers -m user -a "name=test password=secure_password state=present"`` 
+  - target webservers group in inventory using the user module to create a user with password as supplied. The state=present arg means only do so if the user is not already there on the machine
+- Try logging in to one of these systems as the newly created user.
+- ``ansible webservers -m user -a "name=test password=secure_password state=absent"`` will remove the users
+
+### Selecting modules for ad-hoc commands
+
+Finding information about ansible modules
+- ``ansibl-doc -l`` command lists all modules installed on a system
+- The name and a description of the module are displayed
+- Thousands of modules are available: consider piping the output into a ``grep`` to filter the result.
+- The same information is available from the [Ansible website](https://docs.ansible.com/ansible/2.8/modules/list_of_all_modules.html)
+
+Some selected modules include:
+- file modules
+  - ``copy`` module - copies a local file to the manages host
+  - ``file`` module - sets permissions and other properties of files
+  - ``lineinfile`` module - checks a particular line is or is not in a file
+  - ``synchronize`` module - synchronizes content using rsync
+- software package modules
+  - 
+
+
+2:16

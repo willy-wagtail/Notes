@@ -52,4 +52,62 @@ Kubernetes network policy
 - once a pod is selected using network policy (using labels), it becomes an isolated pod
 - policy applies only on new connections, rather than already established connections
 
-Service accounts
+# Service accounts
+
+provides identity to pods in cluster
+stored and managed by cluster
+scoped to namespace
+
+access control
+- service accounts are compatible with role based access control (RBAC)
+- pods have a token mounted on a volume that can be used to authenticate rquests
+- default service account token has no additional permissions than an unauthenticated user
+
+``kubectl get -n keep-system serviceaccounts | more``
+- name for system resources
+
+``kubectl describe -n kube-system clusterrole system:coredns``
+- coredns role
+
+service accounts and image pull secrets
+- image pull secrets authenticate with private container registries
+- service accounts can also store image pull secrets
+
+# Leveraging kubectl
+
+Command completion
+- ``kubectl`` lists all commands
+- ``kubectl completion -h`` for instructions
+- ``echo "source <(kubectl completion bash)" >> ~/.bash_profile`` add to bash profile to have completion everytime.
+
+- ``kubectl get`` tab tab
+- short names for resources ``kubectl api-resources``
+- ``kubectl get pods --all-namespaces --show-labels``
+- ``kubectl get pods --all-namespaces -L k8s-app`` - specific labels separated by comma
+- ``kubectl get pods --all-namespaces -L k8s-app -l k8s-app`` - shows with label defined. -l is a filter
+
+
+- ``kubectl get pods --all-namespaces -L k8s-app -l k8s-app=kube-proxy`` 
+- ``kubectl get pods -n kube-system --sort-by=metadata.creationTimestamp`` for sorting using json path
+- ``kubectl get pods -n kube-system --sort-by='(.metadata.creationTimestamp)'`` - better way json path
+- ``kubectl get pods -n kube-system kube-proxy-hwjjt --output=yaml`` can see what to sort by in yaml format. can use ``-o``
+- ``kubectl get pods -n kube-system kube-proxy-hwjjt --sort-by='{.status.podIP}'``
+
+- ``kubectl get pods -n kube-system kube-proxy-hwjjt --sort-by='{.status.podIP}' -o wide`` wide format to see IP to see that IPs are sorted
+
+- ``kubectl get pods -n kube-system kube-proxy-hwjjt --sort-by='{.status.podIP}' -o jsonpath='{.items[*].status.podIP}'`` as list is returned. jsonpaths can get way more complex.
+
+## creating resources
+
+``kubectl create -h | less``
+- better to use manifest file to have infra as code.
+- we can run it to get the yaml with --dry-run false and --output yaml
+- ``mkdir tips``
+- ``kubectl create namespace tips -o yaml --dry-run > tips/1-namespace.yaml``
+
+``kubectl run nginx --image=nginx --port 80 -- replicas=2 --expose --dry-run -o yaml``
+
+
+vim 
+- use ``vimtutor`` to go through lessons from scratch
+

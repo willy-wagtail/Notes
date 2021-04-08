@@ -407,6 +407,8 @@ Lets try creating users on our target machines
 - Try logging in to one of these systems as the newly created user.
 - ``ansible webservers -m user -a "name=test password=secure_password state=absent"`` will remove the users
 
+``state`` argument tells ansible the end state in which we want the machine to end up in.
+
 ### Selecting modules for ad-hoc commands
 
 Finding information about ansible modules
@@ -422,7 +424,73 @@ Some selected modules include:
   - ``lineinfile`` module - checks a particular line is or is not in a file
   - ``synchronize`` module - synchronizes content using rsync
 - software package modules
-  - 
+  - ``yum`` module - manages packages using yum
+  - ``dnf`` module - manages packages using DNF
+  - ``gem`` module - manages Ruby gems
+- system modules
+  - ``firewalld`` module - manage arbitrary ports and services using firewalld
+  - ``reboot`` module - reboots a machine
+  - ``service`` module - manages services
+  - ``user`` - adds, removes, and manages user accounts
+- net tools modules
+  - ``get_url`` module - downloads files over http, https, or ftp
+  - ``nmcli`` module - manages networking
+  - ``uri`` module - interacts with web services and communicates with APIs
 
+Managing package using ``package`` module
+- ``ansible-doc package`` to find out how the module works
+  - ``name`` is the name of package or a list of packages to manage
+  - ``state`` specifies whether the package must be present, absent, or the latest version. This is used to remove or update packages
+  - E.g. ``ansible all -m package -a 'name=httpd state=present'`` will ensure the ``httpd`` package is installed on al hosts.
+  - other modules are also available including ``yum``, ``dnf``, and ``apt`` that work in a similar way but which might support more sophisticated options specific to those managers.
+  - ``package`` module aims to be system agnostic
 
-2:16
+Command Modules
+- handful of modules that run commands directly on the managed host
+- use these if no other modules are available to do what you need
+- these are not idempotent - you must make sure that they are safe to run twice when using them
+- ``command`` runs a single command on the remote system
+  - cannot access shell env vars or perform shell operations such as redirection and piping.
+  - E.g ``ansible mymanagedhosts -m command -a /usr/bin/hostname``
+- ``shell`` runs a command on the remote system's shell (redirection and other features work)
+  - ``ansible localhost -m command -a set`` (this will fail)
+  - ``ansible localhost -m shell -a set`` (this will change the shell and output BASH=/bin/sh)
+- ``raw`` simply runs a command with no processing (can be dangerous)
+  - this bypasses module subsystem completely, useful when managing systems that cannot have python installed (e.g. a network router).
+- in general, aim to use regular modules before resorting to these
+
+Disadvantages of Ad hoc commands
+- only call one module at a time
+- type the same command again to rerun it - options can get complex
+- manual in nature
+
+Better approach is to use Ansible Playbooks.
+- run multiple modules with conditionals and other processing
+- text files which can be tracked in version control
+- can be rerun with a simple command
+
+### Demo
+
+Goal: Add users to a group we create.
+
+- ``ansible-doc -l | grep group | less`` to find a module to manage group creation
+- ``ansible-doc group`` - check group docs
+  - options we need are name and state (which defaults to present so can omit).
+- ``ansible webservers -m group -a "name=test"``
+  - this will create a user group called test
+  - rerun it to demonstrate idempotency. The second run will report that the group is already present.
+- ``ansible webservers -m user -a "name=test group=demo"``
+  - this will add user called test to group demo.
+  - rerunning it, will show that it is already in state present
+- ``ansible webservers -m user -a "name=test group=demo state=absent"``
+  - this will remove the user called test in group demo
+  - rerunning it, again will report success without doing anything
+- ``ansible webservers -m group -a "name=test state=absent"``
+  - this will remove the group called test
+
+Goal: Install apache webserver
+
+- ``ansible webservers -m package -a "name=httpd state=present"`` to add
+- ``ansible webservers -m package -a "name=httpd state=absent"`` to remove
+- ``ansible webservers -m yum -a "name=httpd state=present"`` to add using yum if using redhat linux system
+- ``ansible webservers -m yum -a "name=httpd state=absent"`` to remove

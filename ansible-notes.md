@@ -494,3 +494,67 @@ Goal: Install apache webserver
 - ``ansible webservers -m package -a "name=httpd state=absent"`` to remove
 - ``ansible webservers -m yum -a "name=httpd state=present"`` to add using yum if using redhat linux system
 - ``ansible webservers -m yum -a "name=httpd state=absent"`` to remove
+
+## 4 Ansible Playbooks
+
+Ansible Playbooks is the main way to automate tasks in Ansible. It is a YAML file containing a list of one or more plays to run in a specific order.
+- a play is an ordered list of tasks run against specific hosts within an inventory.
+- each task runs a module that performs some simple action on or for the managed host
+- most tasks are idempotent and can safely run a second time without problems
+
+Example playbook containing a single task:
+```
+---
+- name: Converted ad hoc command example
+  hosts: all
+  become: yes
+  tasks: 
+    - name: user exists with UID 4000
+      user:
+        name: newbie
+        uid: 4000
+        state: present
+```
+- always begin with 3 dashes to denote the start of the file
+- ``name`` the play to describe the play, ``hosts`` for what machines to target, ``become`` is the prviliege escalation
+- ``tasks`` section lists all the tasks, which contain a single ansible module.
+- ``name`` describes the task, ``user`` is the ansible module, followed by arguments to be passed to the user module.
+
+To execute the playbook, use ``ansible-playbook`` followed by the filename using relative or absolute pathing, e.g. ``ansible-playbook site.yml``.
+- Ansible will output name of play, task gathering facts which gathers info about each host, then each task is run in top-down order, finally a summary and status of each task in the play.
+
+You can also limit the hosts you target on a particular run with the ``--limit`` flag. The limit is a host pattern that further limits the hosts for the play.
+- e.g. a play has ``hosts: webservers`` in its definition
+- you can run the playbook containing the play with the ``--limit datacenter2`` option to only run it on the hosts under the ``datacenter2`` inventory group.
+- like this: ``ansible-playbook site.yml --limit datacenter2``
+
+You can validate a playbook using ``--syntax-check``.
+- running it on the playbook will verify that it can be ingested by ansible.The option can either before or after the playbook.
+- e.g. ``ansible-playbook --syntax-check webserver.yml``. It will tell you if the file is correct or not.
+
+You can perform a dry run of the playbook execution by using the ``-C`` option. This causes ansible to report what changes would have occurred if the playbook were executed, without making any actual changes.
+- E.g. ``ansible-playbook -C webserver.yml``
+
+### Demo
+
+``vim example.yml`` to create our first playbook yaml
+```
+---
+- name: New user is created
+  hosts: webservers
+  become: true
+  tasks:
+    - name: User gets created
+      user:
+        name: test
+        state: present
+```
+- execute by running ``ansible-playbook example.yml``
+- rerun it to see the idempotent property of the playbook
+
+Next change the playbook so ``state: absent``.
+- lets use ``limit`` feature to run it one host at a time.
+- ``ansible-playbook --limit web01 example.yml``
+- ``ansible-playbook --limit web02 example.yml``
+
+
